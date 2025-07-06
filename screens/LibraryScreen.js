@@ -1,6 +1,6 @@
-// screens/LibraryScreen.js (Com correção de escopo do 'styles')
+// screens/LibraryScreen.js
 
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext } from 'react'; // Removido o 'useEffect' que não é mais necessário
 import { 
   StyleSheet, 
   Text, 
@@ -13,28 +13,25 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@react-native-async-storage/async-storage'; // 1. AsyncStorage foi removido
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { ThemeContext } from '../context/ThemeContext';
 import LogoApp from '../image/LogoApp.png'; 
 
-const API_URL = 'http://192.168.1.5:5000/processar';
-const STORAGE_KEY = '@MinhaBibliotecaDeAudio';
-
+// A URL da sua API no Fly.io
+const API_URL = 'https://back-and-learn-project.fly.dev/processar';
 
 export default function LibraryScreen() {
   const { colors } = useContext(ThemeContext);
   const navigation = useNavigation();
   
-  // A lógica de estado permanece a mesma
   const [status, setStatus] = useState('idle');
+  // A biblioteca agora começa vazia e vive apenas no estado do componente.
+  // Quando o app fechar, esta informação será perdida, o que é o comportamento desejado.
   const [library, setLibrary] = useState({});
 
-  // ### CORREÇÃO AQUI ###
-  // Movemos o BookCard para DENTRO do LibraryScreen
-  // Agora ele tem acesso à constante 'styles' que será definida logo abaixo
   const BookCard = ({ book, onPress, onLongPress }) => {
     const generateColor = (name) => { let hash = 0; for (let i = 0; i < name.length; i++) { hash = name.charCodeAt(i) + ((hash << 5) - hash); } let color = '#'; for (let i = 0; i < 3; i++) { let value = (hash >> (i * 8)) & 0xFF; color += ('00' + value.toString(16)).substr(-2); } return color; };
     const getInitials = (name) => name.split(' ').map(n => n[0]).join('').substr(0, 2).toUpperCase();
@@ -49,7 +46,6 @@ export default function LibraryScreen() {
     );
   };
   
-  // A folha de estilos agora é definida depois do BookCard, mas antes do return
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', paddingTop: 50, },
     centered: { justifyContent: 'center' },
@@ -66,12 +62,48 @@ export default function LibraryScreen() {
     emptySubtitle: { fontSize: 16, color: colors.subtext, textAlign: 'center', marginTop: 10 },
   });
 
-  // O resto do componente (useEffect e funções de handle) continua o mesmo
-  useEffect(() => { const loadLibrary = async () => { const savedLibrary = await AsyncStorage.getItem(STORAGE_KEY); if (savedLibrary) setLibrary(JSON.parse(savedLibrary)); }; loadLibrary(); }, []);
-  const handleDeleteBook = (bookName) => { Alert.alert("Confirmar Exclusão", `Excluir "${bookName}"?`, [{ text: "Cancelar", style: "cancel" }, { text: "Confirmar", onPress: async () => { const updatedLibrary = { ...library }; delete updatedLibrary[bookName]; setLibrary(updatedLibrary); await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLibrary)); }, style: "destructive" }]); };
-  const handleSelecionarPDF = async () => { setStatus('loading'); try { const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true }); if (result.type === 'success' || (result.assets && result.assets.length > 0)) { const fileToUpload = result.assets ? result.assets[0] : result; const formData = new FormData(); formData.append('file', { uri: fileToUpload.uri, name: fileToUpload.name, type: 'application/pdf' }); const response = await axios.post(API_URL, formData, { headers: { 'Content-Type': 'multipart/form-data' } }); if (response.data?.status === 'sucesso') { const newBook = { name: fileToUpload.name, urls: response.data.audio_urls }; const updatedLibrary = { ...library, [newBook.name]: newBook }; setLibrary(updatedLibrary); await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLibrary)); setStatus('idle'); Alert.alert("Sucesso!", `O livro "${newBook.name}" foi adicionado.`); } else { throw new Error('Resposta da API inválida.'); } } else { setStatus('idle'); } } catch (error) { console.error(error); Alert.alert("Erro", "Não foi possível processar o PDF."); setStatus('idle'); } };
+  // 2. O useEffect que carregava a biblioteca do AsyncStorage foi removido.
+
+  const handleDeleteBook = (bookName) => {
+    Alert.alert("Confirmar Exclusão", `Excluir "${bookName}" da sessão atual?`, [{ text: "Cancelar", style: "cancel" }, { text: "Confirmar", onPress: () => {
+        const updatedLibrary = { ...library };
+        delete updatedLibrary[bookName];
+        setLibrary(updatedLibrary);
+        // 3. A linha que salvava no AsyncStorage foi removida.
+    }, style: "destructive" }]);
+  };
+
+  const handleSelecionarPDF = async () => {
+    setStatus('loading');
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+      if (result.type === 'success' || (result.assets && result.assets.length > 0)) {
+        const fileToUpload = result.assets ? result.assets[0] : result;
+        const formData = new FormData();
+        formData.append('file', { uri: fileToUpload.uri, name: fileToUpload.name, type: 'application/pdf' });
+        
+        const response = await axios.post(API_URL, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+
+        if (response.data?.status === 'sucesso') {
+          const newBook = { name: fileToUpload.name, urls: response.data.audio_urls };
+          const updatedLibrary = { ...library, [newBook.name]: newBook };
+          setLibrary(updatedLibrary);
+          // 4. A linha que salvava no AsyncStorage foi removida.
+          setStatus('idle');
+          Alert.alert("Sucesso!", `O livro "${newBook.name}" foi adicionado à sua sessão de audição.`);
+        } else {
+          throw new Error('Resposta da API inválida.');
+        }
+      } else {
+        setStatus('idle');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erro", "Não foi possível processar o PDF. Verifique sua conexão e tente novamente.");
+      setStatus('idle');
+    }
+  };
   
-  // A lógica de renderização do return continua a mesma
   if (status === 'loading') {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -89,7 +121,7 @@ export default function LibraryScreen() {
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons name="bookshelf" size={80} color={colors.subtext} />
           <Text style={styles.emptyTitle}>Biblioteca Vazia</Text>
-          <Text style={styles.emptySubtitle}>Clique no botão '+' para adicionar seu primeiro PDF.</Text>
+          <Text style={styles.emptySubtitle}>Clique no botão '+' para adicionar seu primeiro PDF e iniciar uma sessão de audição.</Text>
         </View>
       ) : (
         <FlatList
