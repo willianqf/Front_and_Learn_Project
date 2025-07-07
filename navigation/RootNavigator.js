@@ -1,5 +1,7 @@
+// navigation/RootNavigator.js (Versão Corrigida)
+
 import React, { useContext } from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native'; // 1. Importamos os temas padrão
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,7 +16,6 @@ import AboutScreen from '../screens/AboutScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// O componente LibraryStack não precisa de alterações
 function LibraryStack() {
   const { colors } = useContext(ThemeContext);
   return (
@@ -27,20 +28,30 @@ function LibraryStack() {
       }}
     >
       <Stack.Screen name="LibraryHome" component={LibraryScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Player" component={PlayerScreen} options={({ route }) => ({ title: route.params.book.name })} />
+      {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL */}
+      <Stack.Screen
+        name="Player"
+        component={PlayerScreen}
+        options={({ route }) => ({
+          // Usamos "optional chaining" (?.) para evitar o erro se os parâmetros não existirem.
+          // E usamos a nova propriedade 'nome_original' do objeto 'bookInfo'.
+          title: route.params?.bookInfo?.nome_original || 'Player',
+          headerBackTitleVisible: false,
+        })}
+      />
     </Stack.Navigator>
   );
 }
 
+// O resto do arquivo permanece o mesmo...
 export default function RootNavigator() {
   const { theme, colors } = useContext(ThemeContext);
 
-  // 2. Criamos nossos temas customizados ESTENDENDO os padrões
   const MyLightTheme = {
-    ...DefaultTheme, // Copia todas as propriedades do tema claro padrão
+    ...DefaultTheme,
     colors: {
-      ...DefaultTheme.colors, // Copia todas as cores padrão
-      background: colors.background, // E sobrescreve apenas as que queremos
+      ...DefaultTheme.colors,
+      background: colors.background,
       card: colors.card,
       text: colors.text,
       primary: colors.primary,
@@ -48,7 +59,7 @@ export default function RootNavigator() {
   };
 
   const MyDarkTheme = {
-    ...DarkTheme, // Copia todas as propriedades do tema escuro padrão
+    ...DarkTheme,
     colors: {
       ...DarkTheme.colors,
       background: colors.background,
@@ -58,7 +69,6 @@ export default function RootNavigator() {
     },
   };
 
-  // 3. Escolhemos qual tema customizado usar
   const currentTheme = theme === 'light' ? MyLightTheme : MyDarkTheme;
 
   return (
@@ -81,8 +91,8 @@ export default function RootNavigator() {
           tabBarInactiveTintColor: colors.icon,
           tabBarStyle: { 
             backgroundColor: colors.card, 
-            borderTopColor: colors.card, // Deixa a borda da mesma cor para sumir
-            elevation: 0, // Remove sombra no Android
+            borderTopColor: colors.card,
+            elevation: 0,
           },
           headerShown: false,
         })}
