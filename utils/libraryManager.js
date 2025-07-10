@@ -1,13 +1,7 @@
-// Front-and/src/utils/libraryManager.js
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LIBRARY_KEY = '@HearLearn:library';
 
-/**
- * Carrega todos os livros da biblioteca.
- * @returns {Promise<Array>} Uma promessa que resolve para um array de livros.
- */
 export const loadLibrary = async () => {
   try {
     const jsonValue = await AsyncStorage.getItem(LIBRARY_KEY);
@@ -19,54 +13,64 @@ export const loadLibrary = async () => {
 };
 
 /**
- * Salva um novo livro na biblioteca.
- * @param {object} newBook - O objeto do livro a ser salvo.
+ * Salva ou ATUALIZA um livro na biblioteca.
+ * @param {object} bookData - O objeto do livro a ser salvo ou atualizado.
  * @returns {Promise<void>}
  */
-export const saveBook = async (newBook) => {
+export const saveBook = async (bookData) => {
   try {
-    const library = await loadLibrary();
-    // Verifica se o livro já existe para evitar duplicatas
-    const bookExists = library.some(book => book.id_arquivo === newBook.id_arquivo);
-    
-    if (!bookExists) {
-      const newLibrary = [...library, newBook];
-      const jsonValue = JSON.stringify(newLibrary);
-      await AsyncStorage.setItem(LIBRARY_KEY, jsonValue);
-      console.log("Livro salvo com sucesso na biblioteca!");
+    let library = await loadLibrary();
+    const bookIndex = library.findIndex(book => book.id_arquivo === bookData.id_arquivo);
+
+    if (bookIndex !== -1) {
+      // O livro já existe, então atualiza-o
+      library[bookIndex] = { ...library[bookIndex], ...bookData };
+      console.log(`Livro ${bookData.id_arquivo} atualizado.`);
     } else {
-      console.log("Este livro já está na biblioteca.");
+      // O livro é novo, adiciona-o com estado inicial se não tiver
+      const newBook = { ...bookData, status: bookData.status || 'ready', lastPosition: 0 };
+      library.push(newBook);
+      console.log(`Livro ${bookData.id_arquivo} salvo.`);
     }
+
+    const jsonValue = JSON.stringify(library);
+    await AsyncStorage.setItem(LIBRARY_KEY, jsonValue);
   } catch (e) {
     console.error("Erro ao salvar o livro.", e);
   }
 };
 
-/**
- * Remove um livro da biblioteca.
- * @param {string} bookId - O id_arquivo do livro a ser removido.
- * @returns {Promise<void>}
- */
+// ... as outras funções (removeBook, clearLibrary, etc.) permanecem as mesmas
+export const updateBookProgress = async (bookId, pageIndex) => {
+    try {
+        const library = await loadLibrary();
+        const newLibrary = library.map(book => {
+            if (book.id_arquivo === bookId) {
+                return { ...book, lastPosition: pageIndex };
+            }
+            return book;
+        });
+        const jsonValue = JSON.stringify(newLibrary);
+        await AsyncStorage.setItem(LIBRARY_KEY, jsonValue);
+    } catch (e) {
+        console.error("Erro ao atualizar o progresso do livro.", e);
+    }
+};
+
 export const removeBook = async (bookId) => {
     try {
         const library = await loadLibrary();
         const newLibrary = library.filter(book => book.id_arquivo !== bookId);
         const jsonValue = JSON.stringify(newLibrary);
         await AsyncStorage.setItem(LIBRARY_KEY, jsonValue);
-        console.log(`Livro ${bookId} removido com sucesso.`);
     } catch (e) {
         console.error("Erro ao remover o livro.", e);
     }
 };
 
-/**
- * Limpa toda a biblioteca (útil para desenvolvimento).
- * @returns {Promise<void>}
- */
 export const clearLibrary = async () => {
     try {
         await AsyncStorage.removeItem(LIBRARY_KEY);
-        console.log("Biblioteca limpa com sucesso.");
     } catch (e) {
         console.error("Erro ao limpar a biblioteca.", e);
     }
